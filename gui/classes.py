@@ -3,7 +3,7 @@ import time
 
 import pygame as pg
 
-import constants
+import enums
 from utils import Vector2
 
 
@@ -48,21 +48,27 @@ class GUI_Object:
         pass
 
 class Cell(GUI_Object):
-    def __init__(self, screen: pg.display, pos: Vector2, size: Vector2, inactive_color: Colors.__dict__, active_color: Colors.__dict__):
+    def __init__(self, screen: pg.display, pos: Vector2, size: Vector2, inactive_color: Colors.__dict__, active_color: Colors.__dict__, border_width: int = 0):
         super().__init__(screen, pos, size, inactive_color)
         self.inactive_color = inactive_color
         self.active_color = active_color
+        self.border_width = border_width
+        self.inner_rect_size = self.size - Vector2(border_width, border_width)
+        self.inner_rect_pos = self.pos + Vector2(border_width // 2, border_width // 2)
 
-    def swapColor(self):
-        if self.color == self.inactive_color:
-            self.color = self.active_color
-        elif self.color == self.active_color:
-            self.color = self.inactive_color
+    def setActive(self):
+        self.color = self.active_color
+
+    def setInactive(self):
+        self.color = self.inactive_color
 
     def draw(self) -> None:
-        pg.draw.rect(self.screen, self.color, (self.pos.getTuple(), self.size.getTuple()))
+        pg.draw.rect(self.screen, self.active_color, (self.pos.getTuple(), self.size.getTuple()))
+        pg.draw.rect(self.screen, self.color, (self.inner_rect_pos.getTuple(), self.inner_rect_size.getTuple()))
+
     def update(self) -> Ellipsis:
         self.draw()
+
 
 class Grid(GUI_Object):
     def __init__(self, screen: pg.display, pos: Vector2, size: Vector2, color: Colors.__dict__, grid_size: Vector2, thickness: int):
@@ -84,34 +90,74 @@ class Grid(GUI_Object):
     def update(self) -> Ellipsis:
         self.draw()
 
+class Menu(GUI_Object):
+
+    def __init__(self, screen: pg.display, pos: Vector2, size: Vector2, color: Colors.__dict__, menu_layout: dict):
+        super().__init__(screen, pos, size, color)
+
+        self.buttons = []
+        self.texts = []
+        for k, v in menu_layout.items():
+            obj = v["obj"]
+            state = v["state"]
+            gui_kwargs = v["gui_kwargs"]
+            gui_kwargs["pos"] += pos
+            gui_obj = Cell(self.screen, inactive_color=Colors.black, active_color=Colors.purple, **gui_kwargs)
+            btn = obj(gui_obj, state)
+
+            self.texts.append(k)
+
+            self.buttons.append(btn)
+
+
+
+    def draw(self) -> None:
+        pass
+
+    def update(self):
+        self.draw()
+
+
 class GUI_Drawer:
-    def __init__(self, screen_size: Vector2, grid_size: Vector2, grid_thickness: int, max_fps: int = 60):
+    def __init__(self, grid_size: Vector2, grid_thickness: int, cell_size: Vector2, menu_size: Vector2, menu_layout: dict, max_fps: int = 60):
         pg.init()
         self.pg_events = pg.event.get()
         pg.font.init()
         self.pg_font = pg.font.SysFont('Roboto Mono', 20)
 
-        self.screen_size = screen_size
+        grid_screen_size = grid_size * cell_size
+
+        menu_size.x = grid_screen_size.x
+
+        self.screen_size = grid_size * cell_size
+        self.screen_size.y += menu_size.y
+
         self.screen = pg.display.set_mode(self.screen_size.getTuple())
         self.clock = pg.time.Clock()
-        self.max_fps = max_fps
+        self.__max_fps = max_fps
 
-        self.grid = Grid(self.screen,  Vector2(0, 0), self.screen_size, Colors.white, grid_size, grid_thickness)
+        self.grid = Grid(self.screen,  Vector2(0, 0), grid_screen_size, Colors.white, grid_size, grid_thickness)
+        self.menu = Menu(self.screen, Vector2(0, self.screen_size.y - menu_size.y), menu_size, Colors.white, menu_layout)
 
     def renderCurrentStateText(self, text: str, text_pos: Vector2):
         text_surface = self.pg_font.render(text, True, Colors.white)
         self.screen.blit(text_surface, text_pos.getTuple())
 
+    def setMaxFPS(self, max_fps: int):
+        self.__max_fps = max_fps
 
     def drawGrid(self):
         self.grid.update()
+
+    def drawMenu(self):
+        self.menu.update()
 
     def clearScreen(self, color: Colors.__dict__ = Colors.black):
         self.screen.fill(color)
 
     def updateScreen(self):
         pg.display.update()
-        self.clock.tick(self.max_fps)
+        self.clock.tick(self.__max_fps)
 
 
 if __name__ == "__main__":

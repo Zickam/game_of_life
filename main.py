@@ -9,56 +9,262 @@ import pygame as pg
 
 import gui
 from utils import Vector2
-import constants
+import enums
 
 
 
 class Cell:
-    def __init__(self, state: constants.CellStates.__dict__, gui_object):
-        self.state = state
+    def __init__(self, gui_object: gui.classes.Cell, state: enums.CellStates.__dict__ = enums.CellStates.empty):
+        self.__state = state
         self.gui_object = gui_object
+
+        match self.__state:
+            case enums.CellStates.not_empty:
+                self.setActive()
+            case enums.CellStates.empty:
+                self.setInactive()
+            case other:
+                raise Exception(f"Unacceptable arg: {other}")
+
+
+    def changeState(self):
+        match self.__state:
+            case enums.CellStates.not_empty:
+                self.setInactive()
+            case enums.CellStates.empty:
+                self.setActive()
+            case other:
+                raise Exception(f"Unexpected argument: {other}")
+
+    def setInactive(self):
+        self.__state = enums.CellStates.empty
+        self.gui_object.setInactive()
+
+    def setActive(self):
+        self.__state = enums.CellStates.not_empty
+        self.gui_object.setActive()
+
+    def getState(self):
+        return self.__state
+
+    def update(self, process_clicks: bool, mouse_click_state: tuple[int], mouse_pos: Vector2):
+        gui_obj = self.gui_object
+        gui_obj.update()
+
+        if process_clicks:
+            is_pressed = mouse_click_state[0]
+            is_inside = gui_obj.checkMouseWithinBounds(mouse_pos)
+
+            if is_inside and is_pressed:
+                if gui_obj.next_time_mouse_click_accepted <= time.time():
+                    gui_obj.next_time_mouse_click_accepted = time.time() + gui_obj.MOUSE_CLICK_ACCEPT_TIME_INTERVAL
+                    self.changeState()
+
+
+class Field:
+    def __init__(self,
+                 gui_drawer: gui.classes.GUI_Drawer,
+                 start_mode: enums.StartModes.__dict__,
+                 not_empty_cells_percent_approx: int,
+                 grid_size: Vector2,
+                 grid_thickness: int,
+                 cell_size: Vector2,
+                 cell_margin: Vector2, ):
+
+        self.__gui_drawer = gui_drawer
+        self.__start_mode = start_mode
+        self.__not_empty_cells_percent_approx = not_empty_cells_percent_approx
+        self.__grid_size = grid_size
+        self.__cell_size = cell_size
+        self.__cell_margin = cell_margin
+        self.__grid_thickness = grid_thickness
+
+        self.__field = []
+
+        cell_size_with_margin = self.__cell_size - self.__cell_margin
+        cell_offset_margin_compensation = Vector2(self.__cell_margin.x // 2, self.__cell_margin.y // 2)
+
+        for i in range(self.__grid_size.y):
+            tmp = []
+            for j in range(self.__grid_size.x):
+                pos = Vector2(j * self.__cell_size.x + cell_offset_margin_compensation.x,
+                              i * self.__cell_size.y + cell_offset_margin_compensation.y)
+                gui_obj = gui.classes.Cell(self.__gui_drawer.screen,
+                                           pos,
+                                           cell_size_with_margin,
+                                           gui.classes.Colors.black,
+                                           gui.classes.Colors.purple
+                                           )
+
+                match self.__start_mode:
+                    case enums.StartModes.empty_field:
+                        cell = Cell(gui_obj)
+                    case enums.StartModes.full_field:
+                        cell = Cell(gui_obj)
+                        cell.changeState()
+                    case enums.StartModes.random_field:
+                        cell = self.randCellState(gui_obj, self.__not_empty_cells_percent_approx)
+
+                tmp.append(cell)
+
+            self.__field.append(tmp)
+
+    def processTick(self) -> list[list[Cell, ...], ...]:
+        new_field = []
+
+        for i in range(len(self.__field)):
+            tmp = []
+            for j in range(len(self.__field[0])):
+                cell = self.__field[i][j]
+
+                neighbours = self.__getAmountOfNeighbours(i, j)
+                new_cell = Cell(cell.gui_object, cell.getState())
+
+                if cell.getState() == enums.CellStates.not_empty:
+                    if neighbours == 2 or neighbours == 3:
+                        pass
+                    else:
+                        new_cell.changeState()
+
+                if cell.getState() == enums.CellStates.empty:
+                    if neighbours == 3:
+                        new_cell.changeState()
+                    else:
+                        pass
+
+                tmp.append(new_cell)
+
+            new_field.append(tmp)
+
+        self.__field = new_field
+
+        return new_field
+
+    def __getAmountOfNeighbours(self, i, j) -> int:
+        amount_of_neighbours = 0
+
+        if i > 0 and self.__field[i - 1][j].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if i > 0 and j + 1 < len(self.__field[i]) and self.__field[i - 1][j + 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if j + 1 < len(self.__field[i]) and self.__field[i][j + 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if i + 1 < len(self.__field) and j + 1 < len(self.__field[i]) and self.__field[i + 1][j + 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if i + 1 < len(self.__field) and self.__field[i + 1][j].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if i + 1 < len(self.__field) and j > 0 and self.__field[i + 1][j - 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if j > 0 and self.__field[i][j - 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+        if i > 0 and j > 0 and self.__field[i - 1][j - 1].getState() == enums.CellStates.not_empty:
+            amount_of_neighbours += 1
+
+        return amount_of_neighbours
+
+    @staticmethod
+    def getRandomCellState(percent: int) -> enums.CellStates.__dict__:
+        if not (0 <= percent <= 100):
+            raise Exception("Unallowed percentage provided!")
+
+        rand_num = random.randint(0, 100 - 1)
+
+        if 0 <= rand_num <= percent:
+            return enums.CellStates.not_empty
+        else:
+            return enums.CellStates.empty
+
+    @classmethod
+    def randCellState(cls, gui_obj: gui.classes.Cell, not_empty_cells_percent_approx: int) -> Cell:
+        rand_cell_state = cls.getRandomCellState(not_empty_cells_percent_approx)
+
+        match rand_cell_state:
+            case enums.CellStates.empty:
+                cell = Cell(gui_obj)
+
+            case enums.CellStates.not_empty:
+                cell = Cell(gui_obj)
+                cell.changeState()
+
+        return cell
+
+    def getField(self) -> list[list[Cell, ...], ...]:
+        return self.__field
 
 
 class Game:
-    def __init__(self, gui_drawer: gui.classes.GUI_Drawer, field: list[list[Cell, ...], ...],
-                 max_iterations_per_second: float, perform_iterations_on_original_field: bool = True):
-        self.gui_drawer = gui_drawer
-        self.field = field
+    MAX_FPS = 144
+    GRID_SIZE = Vector2(50,  50)
+    CELL_SIZE = Vector2(12, 12)
+    CELL_MARGIN = Vector2(0, 0)
+    # GRID_THICKNESS = round(0.08 * (CELL_SIZE.x + CELL_SIZE.y) / 2)
+    GRID_THICKNESS = 0
+    START_MODE = enums.StartModes.random_field
+    NOT_EMPTY_CELLS_PERCENT_APPROX = 30
+    MAX_GAME_ITERATIONS_PER_SECOND = 10
+    PERFORM_ACTIONS_IN_PLACE = False
+    CAP_FPS_TO_REAL_TIME_TICKS = False
+    MENU_SIZE = Vector2(0, 100)
+    GAME_ACTIVE = True
+    GUI_ACTIVE = True
+    MENU_LAYOUT = {
+        "GameActive": {"obj": Cell, "state": enums.CellStates.not_empty, "gui_kwargs": {"pos": Vector2(0, 0), "size": Vector2(30, 30), "border_width": 4}},
+        "GUIActive": {"obj": Cell, "state": enums.CellStates.not_empty,
+                       "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 31), "size": Vector2(30, 30), "border_width": 4}},
+    }
 
-        self.max_iterations_per_second = max_iterations_per_second
-        self.perform_iterations_on_original_field = perform_iterations_on_original_field
 
+    def __init__(self):
+        self.max_fps = self.MAX_FPS
+
+        self.not_empty_cells_percent_approx = self.NOT_EMPTY_CELLS_PERCENT_APPROX
+        self.max_iterations_per_second = self.MAX_GAME_ITERATIONS_PER_SECOND
+        self.perform_actions_in_place = self.PERFORM_ACTIONS_IN_PLACE
+        self.start_mode = self.START_MODE
+
+        self.gui_drawer = gui.classes.GUI_Drawer(self.GRID_SIZE, self.GRID_THICKNESS, self.CELL_SIZE, self.MENU_SIZE, self.MENU_LAYOUT, self.MAX_FPS)
+        self.field = Field(self.gui_drawer,
+                           self.start_mode,
+                           self.not_empty_cells_percent_approx,
+                           self.GRID_SIZE,
+                           self.GRID_THICKNESS,
+                           self.CELL_SIZE,
+                           self.CELL_MARGIN)
+
+        self.max_iterations_per_second = self.MAX_GAME_ITERATIONS_PER_SECOND
+        self.perform_iterations_on_original_field = self.PERFORM_ACTIONS_IN_PLACE
         self.calcNextIterationTime()
 
         self.shutdown = False
-        self.game_active = True
-        self.gui_active = True
+        self.game_active = self.GAME_ACTIVE
+        self.gui_active = self.GUI_ACTIVE
 
-        self.frames_passed = 0
-        self.next_fps_update_time = time.time() + 1
-        self.fps = self.frames_passed / self.next_fps_update_time
+        self.__frames_passed = 0
+        self.__next_fps_update_time = time.time() + 1
+        self._fps = self.__frames_passed / self.__next_fps_update_time
 
-        self.iterations_passed = 0
-        self.next_iterations_update_time = time.time() + 1
-        self.iterations_per_second = self.iterations_passed / self.next_iterations_update_time
+        self.__ticks_passed = 0
+        self.__next_ticks_update_time = time.time() + 1
+        self._ticks_per_second = round(self.__ticks_passed / self.__next_ticks_update_time)
 
         self.processEvents()
 
+
     def calcIterationsPerSecond(self):
         curr_time = time.time()
-        if self.next_iterations_update_time <= curr_time:
-            self.iterations_per_second = self.iterations_passed
-            self.iterations_passed = 0
-            self.next_iterations_update_time = time.time() + 1
-            return self.iterations_per_second
+        if self.__next_ticks_update_time <= curr_time:
+            self._ticks_per_second = self.__ticks_passed
+            self.__ticks_passed = 0
+            self.__next_ticks_update_time = time.time() + 1
+            return self._ticks_per_second
 
     def calcFPS(self) -> int:
         curr_time = time.time()
-        if self.next_fps_update_time <= curr_time:
-            self.fps = self.frames_passed
-            self.frames_passed = 0
-            self.next_fps_update_time = time.time() + 1
-            return self.fps
+        if self.__next_fps_update_time <= curr_time:
+            self._fps = self.__frames_passed
+            self.__frames_passed = 0
+            self.__next_fps_update_time = time.time() + 1
+            return self._fps
 
     def calcNextIterationTime(self):
         if self.max_iterations_per_second == 0:
@@ -74,7 +280,7 @@ class Game:
         for event in self.pg_events:
             if event.type == pg.QUIT:
                 self.shutdown = True
-                exit()
+
             if event.type == pg.KEYDOWN:
                 if event.key == 32:
                     self.game_active = not self.game_active
@@ -87,104 +293,94 @@ class Game:
             if self.perform_iterations_on_original_field:
                 processGameIterationInPlace(self.field)
             else:
-                self.field = processGameIteration(self.field)
-            self.iterations_passed += 1
+                self.field.processTick()
+            self.__ticks_passed += 1
 
     def runGame(self):
-        while 1:
+        while not self.shutdown:
             self.processEvents()
 
             if self.next_iteration_time <= time.time():
                 self.processIteration()
                 self.calcNextIterationTime()
 
+    def processGUICells(self, mouse_click_state, mouse_pos):
+        for line in self.field.getField():
+            for cell in line:
+                cell.update(not self.game_active, mouse_click_state, mouse_pos)
+
+    def processGUIMenu(self, mouse_click_state, mouse_pos):
+        for menu_btn, menu_text in zip(self.gui_drawer.menu.buttons, self.gui_drawer.menu.texts):
+            menu_btn.update(True, mouse_click_state, mouse_pos)
+            self.gui_drawer.renderCurrentStateText(menu_text, menu_btn.gui_object.pos + Vector2(menu_btn.gui_object.size.x, 0))
+
+            match menu_text:
+                case "GameActive":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.game_active = True
+                        case enums.CellStates.empty:
+                            self.game_active = False
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "GUIActive":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.gui_active = True
+                        case enums.CellStates.empty:
+                            self.gui_active = False
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+
     def processGUI(self):
+
+        self.gui_drawer.clearScreen()
+
+        mouse_pos = pg.mouse.get_pos()
+        mouse_pos = Vector2(mouse_pos[0], mouse_pos[1])
+        mouse_click_state = pg.mouse.get_pressed()
+
+        self.processGUIMenu(mouse_click_state, mouse_pos)
+
         if self.gui_active:
-            self.gui_drawer.clearScreen()
-
-            mouse_pos = pg.mouse.get_pos()
-            mouse_pos = Vector2(mouse_pos[0], mouse_pos[1])
-            mouse_click_state = pg.mouse.get_pressed()
-
-            for line in self.field:
-                for cell in line:
-                    gui_obj = cell.gui_object
-                    gui_obj.update()
-
-                    is_pressed = mouse_click_state[0]
-                    is_inside = gui_obj.checkMouseWithinBounds(mouse_pos)
-
-                    if is_inside and is_pressed:
-                        if gui_obj.next_time_mouse_click_accepted <= time.time():
-                            gui_obj.next_time_mouse_click_accepted = time.time() + gui_obj.MOUSE_CLICK_ACCEPT_TIME_INTERVAL
-                            gui_obj.swapColor()
-                            if cell.state == constants.CellStates.not_empty:
-                                cell.state = constants.CellStates.empty
-                            elif cell.state == constants.CellStates.empty:
-                                cell.state = constants.CellStates.not_empty
+            self.processGUICells(mouse_click_state, mouse_pos)
 
             self.gui_drawer.drawGrid()
-            self.frames_passed += 1
+            self.gui_drawer.drawMenu()
 
-            self.calcFPS()
-
-
-        text_pos = Vector2(0, 0)
+        text_pos = Vector2(0, self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height())
         self.gui_drawer.renderCurrentStateText('You can draw whatever you want if you stop the game processing',
                                                text_pos)
 
-        text_pos += Vector2(0, self.gui_drawer.pg_font.get_height())
-        if self.game_active:
-            self.gui_drawer.renderCurrentStateText('Game is ongoing (press spacebar to stop)', text_pos)
-        else:
-            self.gui_drawer.renderCurrentStateText('Game stopped (press spacebar to start)', text_pos)
+        text_pos = Vector2(self.gui_drawer.screen_size.x - 80, self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height())
+        self.gui_drawer.renderCurrentStateText(f"fps: {self._fps}", text_pos)
+        text_pos = Vector2(self.gui_drawer.screen_size.x - 191, self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height() * 2)
+        self.gui_drawer.renderCurrentStateText(f"iterations_per_second: {self._ticks_per_second}", text_pos)
 
-        text_pos += Vector2(0, self.gui_drawer.pg_font.get_height())
-        if self.gui_active:
-            self.gui_drawer.renderCurrentStateText('Gui is processing (press g to stop)', text_pos)
-        else:
-            self.gui_drawer.renderCurrentStateText('Gui is not processing (press g to start)', text_pos)
+        self.__frames_passed += 1
+        self.calcFPS()
 
+    def capFPS(self):
+        if not self.game_active or self._ticks_per_second < 5:
+            self.gui_drawer.setMaxFPS(self.max_fps)
+        elif self.CAP_FPS_TO_REAL_TIME_TICKS and self._ticks_per_second > 1:
+            self.gui_drawer.setMaxFPS(self._ticks_per_second + 1)
 
-        text_pos = Vector2(0, self.gui_drawer.screen_size.y) - Vector2(0, self.gui_drawer.pg_font.get_height())
-        self.gui_drawer.renderCurrentStateText(f"fps: {self.fps}", text_pos)
-        text_pos = Vector2(0, self.gui_drawer.screen_size.y) - Vector2(0, self.gui_drawer.pg_font.get_height() * 2)
-        self.gui_drawer.renderCurrentStateText(f"iterations_per_second: {self.iterations_per_second}", text_pos)
     def runGUI(self):
-        while 1:
-            if self.shutdown:
-                exit()
-
+        while not self.shutdown:
             self.processGUI()
+
+            self.capFPS()
 
             self.gui_drawer.updateScreen()
 
     def runGUI_threaded(self):
         self.gui_thread = threading.Thread(target=self.runGUI, args=())
         self.gui_thread.start()
-
-def getAmountOfNeighbours(field: list[list[Cell, ...], ...], i, j) -> int:
-    amount_of_neighbours = 0
-
-    if i > 0 and field[i - 1][j].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if i > 0 and j + 1 < len(field[i]) and field[i - 1][j + 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if j + 1 < len(field[i]) and field[i][j + 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if i + 1 < len(field) and j + 1 < len(field[i]) and field[i + 1][j + 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if i + 1 < len(field) and field[i + 1][j].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if i + 1 < len(field) and j > 0 and field[i + 1][j - 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if j > 0 and field[i][j - 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-    if i > 0 and j > 0 and field[i - 1][j - 1].state == constants.CellStates.not_empty:
-        amount_of_neighbours += 1
-
-    return amount_of_neighbours
-
 
 def processGameIterationInPlace(_field: list[list[Cell, ...], ...]):
     """
@@ -210,135 +406,12 @@ def processGameIterationInPlace(_field: list[list[Cell, ...], ...]):
                 else:
                     pass
 
-
-def processGameIteration(_field: list[list[Cell, ...], ...]) -> list[list[Cell, ...], ...]:
-    new_field = []
-    for i in range(len(_field)):
-        tmp = []
-        for j in range(len(_field[0])):
-            cell = _field[i][j]
-            old_gui_obj = cell.gui_object
-
-            neighbours = getAmountOfNeighbours(_field, i, j)
-
-            gui_object = gui.classes.Cell(old_gui_obj.screen,
-                                          old_gui_obj.pos,
-                                          old_gui_obj.size,
-                                          old_gui_obj.inactive_color,
-                                          old_gui_obj.active_color)
-
-            if cell.state == constants.CellStates.not_empty:
-                if neighbours == 2 or neighbours == 3:
-                    new_cell = Cell(
-                        constants.CellStates.not_empty,
-                        gui_object
-                    )
-                    gui_object.swapColor()
-                    tmp.append(new_cell)
-                else:
-                    new_cell = Cell(
-                        constants.CellStates.empty,
-                        gui_object
-                    )
-                    tmp.append(new_cell)
-
-            if cell.state == constants.CellStates.empty:
-                if neighbours == 3:
-                    new_cell = Cell(
-                        constants.CellStates.not_empty,
-                        gui_object
-                    )
-                    gui_object.swapColor()
-                    tmp.append(new_cell)
-                else:
-
-                    new_cell = Cell(
-                        constants.CellStates.empty,
-                        gui_object
-                    )
-                    tmp.append(new_cell)
-        new_field.append(tmp)
-
-    return new_field
-
-
-def getRandomCellState(percent: int) -> constants.CellStates.__dict__:
-    rand_num = random.randint(0, 100 - 1)
-
-    if 0 <= rand_num <= percent:
-        return constants.CellStates.not_empty
-    else:
-        return constants.CellStates.empty
-
-def randCellState(gui_obj: gui.classes.Cell, not_empty_cells_percent_approx: int) -> Cell:
-    rand_cell_state = getRandomCellState(not_empty_cells_percent_approx)
-
-    match rand_cell_state:
-        case constants.CellStates.empty:
-            cell = Cell(constants.CellStates.empty, gui_obj)
-
-        case constants.CellStates.not_empty:
-            gui_obj.swapColor()
-            cell = Cell(constants.CellStates.not_empty, gui_obj)
-
-    return cell
-
-def initField(screen: pg.display, grid_size: Vector2, cell_size: Vector2, cell_margin: Vector2, not_empty_cells_percent_approx: int, start_mode: constants.StartModes.__dict__) -> list[list[Cell, ...], ...]:
-    field = []
-
-    cell_size_with_margin = cell_size - cell_margin
-    cell_offset_margin_compensation = Vector2(cell_margin.x // 2, cell_margin.y // 2)
-
-    for i in range(grid_size.y):
-        tmp = []
-        for j in range(grid_size.x):
-            pos = Vector2(j * cell_size.x + cell_offset_margin_compensation.x, i * cell_size.y + cell_offset_margin_compensation.y)
-            gui_obj = gui.classes.Cell(screen,
-                                       pos,
-                                       cell_size_with_margin,
-                                       gui.classes.Colors.black,
-                                       gui.classes.Colors.purple
-                                       )
-
-            match start_mode:
-                case constants.StartModes.empty_field:
-                    cell = Cell(constants.CellStates.empty, gui_obj)
-                case constants.StartModes.full_field:
-                    gui_obj.swapColor()
-                    cell = Cell(constants.CellStates.not_empty, gui_obj)
-                case constants.StartModes.random_field:
-                    cell = randCellState(gui_obj, not_empty_cells_percent_approx)
-
-            tmp.append(cell)
-
-        field.append(tmp)
-
-    return field
-
-
 def calcScreenSize(grid_size: Vector2, cell_size: Vector2) -> Vector2:
     return Vector2(grid_size.x * cell_size.x, grid_size.y * cell_size.y)
 
 
 def main():
-    print("You can draw on your own if you stop the game processing")
-    MAX_FPS = 144
-    GRID_SIZE = Vector2(18, 18)
-    CELL_SIZE = Vector2(40, 40)
-    CELL_MARGIN = Vector2(0, 0)
-    # GRID_THICKNESS = round(0.08 * (CELL_SIZE.x + CELL_SIZE.y) / 2)
-    GRID_THICKNESS = 0
-    NOT_EMPTY_CELLS_PERCENT_APPROX = 30
-    MAX_GAME_ITERATIONS_PER_SECOND = 10
-    PERFORM_ACTIONS_IN_PLACE = False
-    START_MODE = constants.StartModes.random_field
-
-    screen_size = calcScreenSize(GRID_SIZE, CELL_SIZE)
-
-    gui_drawer = gui.classes.GUI_Drawer(screen_size, GRID_SIZE, GRID_THICKNESS, MAX_FPS)
-    field = initField(gui_drawer.screen, GRID_SIZE, CELL_SIZE, CELL_MARGIN, NOT_EMPTY_CELLS_PERCENT_APPROX, START_MODE)
-
-    game = Game(gui_drawer, field, MAX_GAME_ITERATIONS_PER_SECOND, PERFORM_ACTIONS_IN_PLACE)
+    game = Game()
 
     game.runGUI_threaded()
     game.runGame()
