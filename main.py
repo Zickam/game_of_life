@@ -79,6 +79,9 @@ class Field:
         self.__cell_margin = cell_margin
         self.__grid_thickness = grid_thickness
 
+        self.initField()
+
+    def initField(self):
         self.__field = []
 
         cell_size_with_margin = self.__cell_size - self.__cell_margin
@@ -211,6 +214,9 @@ class Game:
         "GameActive": {"obj": Cell, "state": enums.CellStates.not_empty, "gui_kwargs": {"pos": Vector2(0, 0), "size": Vector2(30, 30), "border_width": 4}},
         "GUIActive": {"obj": Cell, "state": enums.CellStates.not_empty,
                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 31), "size": Vector2(30, 30), "border_width": 4}},
+        "RefillField": {"obj": Cell, "state": enums.CellStates.empty,
+                       "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 62), "size": Vector2(30, 30), "border_width": 4}},
+
     }
 
 
@@ -332,6 +338,17 @@ class Game:
                             self.gui_active = True
                         case enums.CellStates.empty:
                             self.gui_active = False
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "RefillField":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.field.initField()
+                            menu_btn.changeState()
+                        case enums.CellStates.empty:
+                            pass
                         case other:
                             raise Exception(f"Unacceptable argument: {other}")
 
