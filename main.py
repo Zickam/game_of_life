@@ -1,9 +1,11 @@
+import builtins
 import random
 import time
 from enum import Enum
 import threading
 import sys
 import math
+from collections.abc import Callable
 
 import pygame as pg
 
@@ -14,9 +16,10 @@ import enums
 
 
 class Cell:
-    def __init__(self, gui_object: gui.classes.Cell, state: enums.CellStates.__dict__ = enums.CellStates.empty):
+    def __init__(self, gui_object: gui.classes.Cell, state: enums.CellStates.__dict__ = enums.CellStates.empty, doOnClickEvents: tuple[Callable, ...] = ()):
         self.__state = state
-        self.gui_object = gui_object
+        self.__gui_object = gui_object
+        self.doOnClickEvents = doOnClickEvents
 
         match self.__state:
             case enums.CellStates.not_empty:
@@ -25,7 +28,6 @@ class Cell:
                 self.setInactive()
             case other:
                 raise Exception(f"Unacceptable arg: {other}")
-
 
     def changeState(self):
         match self.__state:
@@ -38,17 +40,20 @@ class Cell:
 
     def setInactive(self):
         self.__state = enums.CellStates.empty
-        self.gui_object.setInactive()
+        self.__gui_object.setInactive()
 
     def setActive(self):
         self.__state = enums.CellStates.not_empty
-        self.gui_object.setActive()
+        self.__gui_object.setActive()
 
-    def getState(self):
+    def getState(self) -> enums.CellStates.__dict__:
         return self.__state
 
+    def getGUIObject(self) -> gui.classes.Cell:
+        return self.__gui_object
+
     def update(self, process_clicks: bool, mouse_click_state: tuple[int], mouse_pos: Vector2):
-        gui_obj = self.gui_object
+        gui_obj = self.__gui_object
         gui_obj.update()
 
         if process_clicks:
@@ -59,6 +64,10 @@ class Cell:
                 if gui_obj.next_time_mouse_click_accepted <= time.time():
                     gui_obj.next_time_mouse_click_accepted = time.time() + gui_obj.MOUSE_CLICK_ACCEPT_TIME_INTERVAL
                     self.changeState()
+
+    def doOnClick(self):
+        for doOnClickEvent in self.doOnClickEvents:
+            doOnClickEvent()
 
 
 class Field:
@@ -121,7 +130,7 @@ class Field:
                 cell = self.__field[i][j]
 
                 neighbours = self.__getAmountOfNeighbours(i, j)
-                new_cell = Cell(cell.gui_object, cell.getState())
+                new_cell = Cell(cell.getGUIObject(), cell.getState())
 
                 if cell.getState() == enums.CellStates.not_empty:
                     if neighbours == 2 or neighbours == 3:
@@ -318,7 +327,7 @@ class Game:
     def processGUIMenu(self, mouse_click_state, mouse_pos):
         for menu_btn, menu_text in zip(self.gui_drawer.menu.buttons, self.gui_drawer.menu.texts):
             menu_btn.update(True, mouse_click_state, mouse_pos)
-            self.gui_drawer.renderCurrentStateText(menu_text, menu_btn.gui_object.pos + Vector2(menu_btn.gui_object.size.x, 0))
+            self.gui_drawer.renderCurrentStateText(menu_text, menu_btn.getGUIObject().pos + Vector2(menu_btn.getGUIObject().size.x, 0))
 
             match menu_text:
                 case "GameActive":
