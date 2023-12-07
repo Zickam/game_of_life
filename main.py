@@ -280,6 +280,13 @@ class Game:
                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 31), "size": Vector2(30, 30), "border_width": 4}},
         "RefillField": {"obj": Cell, "state": enums.CellStates.empty,
                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 62), "size": Vector2(30, 30), "border_width": 4}},
+        "PlaceGlider": {"obj": Cell, "state": enums.CellStates.empty,
+                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 93), "size": Vector2(30, 30),
+                                       "border_width": 4}},
+        "PlaceMirrorer": {"obj": Cell, "state": enums.CellStates.empty,
+                     "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 124), "size": Vector2(30, 30),
+                                    "border_width": 4}},
+
         "Increase max game speed": {"obj": Cell, "state": enums.CellStates.empty,
                         "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(150, 0), "size": Vector2(30, 30),
                                        "border_width": 4}},
@@ -473,6 +480,30 @@ class Game:
                     match state:
                         case enums.CellStates.not_empty:
                             self.field.loadField()
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "PlaceGlider":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            raise NotImplementedError
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "PlaceMirrorer":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            raise NotImplementedError
                             menu_btn.changeState()
 
                         case enums.CellStates.empty:
