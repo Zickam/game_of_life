@@ -1,1 +1,31 @@
-<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>
+<mxfile host="app.diagrams.net" modified="2023-12-01T11:40:52.733Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36" etag="vR5kTGoFSM0mDduwzcII" version="22.1.5" type="device">
+  <diagram name="Page-1" id="YnNQuIeF-5LmZl4eb-r2">
+    <mxGraphModel dx="2300" dy="1284" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="U76gMoVtC4umcmY9qk1y-2" value="" style="rounded=1;whiteSpace=wrap;html=1;fontSize=16;arcSize=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-20" width="570" height="750" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-3" value="Windows controls" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="20" y="-20" width="570" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-5" value="Grid" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="30" y="30" width="550" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-7" value="Widget" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="-740" y="-10" width="250" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-8" value="Patterns" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="310" y="560" width="270" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-9" value="Controls" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="30" y="560" width="270" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="U76gMoVtC4umcmY9qk1y-10" value="FPS etc" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="30" y="670" width="550" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

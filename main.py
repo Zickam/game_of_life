@@ -177,7 +177,7 @@ class Field:
     @staticmethod
     def getRandomCellState(percent: int) -> enums.CellStates.__dict__:
         if not (0 <= percent <= 100):
-            raise Exception("Unallowed percentage provided!")
+            raise Exception("Not allowed percentage provided!")
 
         rand_num = random.randint(0, 100 - 1)
 
@@ -206,8 +206,8 @@ class Field:
 
 class Game:
     MAX_FPS = 144
-    GRID_SIZE = Vector2(50,  50)
-    CELL_SIZE = Vector2(12, 12)
+    GRID_SIZE = Vector2(40,  40)
+    CELL_SIZE = Vector2(15,  15)
     CELL_MARGIN = Vector2(0, 0)
     # GRID_THICKNESS = round(0.08 * (CELL_SIZE.x + CELL_SIZE.y) / 2)
     GRID_THICKNESS = 0
@@ -225,6 +225,12 @@ class Game:
                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 31), "size": Vector2(30, 30), "border_width": 4}},
         "RefillField": {"obj": Cell, "state": enums.CellStates.empty,
                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(0, 62), "size": Vector2(30, 30), "border_width": 4}},
+        "Increase max game speed": {"obj": Cell, "state": enums.CellStates.empty,
+                        "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(150, 0), "size": Vector2(30, 30),
+                                       "border_width": 4}},
+        "Decrease max game speed": {"obj": Cell, "state": enums.CellStates.empty,
+                                    "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(150, 31), "size": Vector2(30, 30),
+                                                   "border_width": 4}},
 
     }
 
@@ -354,12 +360,41 @@ class Game:
                     state = menu_btn.getState()
                     match state:
                         case enums.CellStates.not_empty:
+                            self.field.is_initializing = True
                             self.field.initField()
+                            self.field.is_initializing = True
                             menu_btn.changeState()
+
                         case enums.CellStates.empty:
                             pass
                         case other:
                             raise Exception(f"Unacceptable argument: {other}")
+
+                case "Increase max game speed":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.max_iterations_per_second += 1
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "Decrease max game speed":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            if self.max_iterations_per_second > 1:
+                                self.max_iterations_per_second -= 1
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
 
 
     def processGUI(self):
@@ -384,8 +419,13 @@ class Game:
 
         text_pos = Vector2(self.gui_drawer.screen_size.x - 80, self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height())
         self.gui_drawer.renderCurrentStateText(f"fps: {self._fps}", text_pos)
-        text_pos = Vector2(self.gui_drawer.screen_size.x - 191, self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height() * 2)
+        text_pos = Vector2(self.gui_drawer.screen_size.x - 191,
+                           self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height() * 2)
         self.gui_drawer.renderCurrentStateText(f"iterations_per_second: {self._ticks_per_second}", text_pos)
+
+        text_pos = Vector2(self.gui_drawer.screen_size.x - 210,
+                           self.gui_drawer.screen_size.y - self.gui_drawer.pg_font.get_height() * 3)
+        self.gui_drawer.renderCurrentStateText(f"Max iterations_per_second: {self.max_iterations_per_second}", text_pos)
 
         self.__frames_passed += 1
         self.calcFPS()
