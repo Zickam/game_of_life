@@ -13,6 +13,8 @@ import gui
 from utils import Vector2
 import enums
 
+SAVE_FILE_PATH = "data/save.bin"
+SAVE_FILE_PATTERN = bytearray([1, 1, 1, 0, 0, 1, 0, 0])
 
 
 class Cell:
@@ -88,10 +90,11 @@ class Field:
         self.__cell_margin = cell_margin
         self.__grid_thickness = grid_thickness
 
+        self.__field: list[list[Cell, ...], ...]
         self.initField()
 
     def initField(self):
-        self.__field = []
+        self.__field: list[list[Cell, ...], ...] = []
 
         cell_size_with_margin = self.__cell_size - self.__cell_margin
         cell_offset_margin_compensation = Vector2(self.__cell_margin.x // 2, self.__cell_margin.y // 2)
@@ -203,10 +206,62 @@ class Field:
     def getField(self) -> list[list[Cell, ...], ...]:
         return self.__field
 
+    def saveField(self):
+        with open(SAVE_FILE_PATH, "wb") as file:
+            file.write(SAVE_FILE_PATTERN)
+            array = []
+            for i in range(len(self.__field)):
+                for j in range(len(self.__field[i])):
+                    match self.__field[i][j].getState():
+                        case enums.CellStates.empty:
+                            array.append(0)
+                        case enums.CellStates.not_empty:
+                            array.append(1)
+                array.append(255)
+
+            file.write(bytearray(array))
+
+    def loadField(self):
+        for i in range(len(self.__field)):
+            for j in range(len(self.__field[i])):
+                self.__field[i][j].setInactive()
+
+        with open(SAVE_FILE_PATH, "rb") as file:
+            start_pattern = file.read()[:len(SAVE_FILE_PATTERN)]
+            if start_pattern != SAVE_FILE_PATTERN:
+                raise Exception("Incorrect save file!")
+            file.seek(len(SAVE_FILE_PATTERN))
+
+            i, j = 0, 0
+            for byte in file.read():
+                if len(self.__field) < i:
+                    continue
+                if len(self.__field[i]) < j:
+                    continue
+
+                try:
+                    match byte:
+                        case 0:
+                            self.__field[i][j].setInactive()
+                            j += 1
+                        case 1:
+                            self.__field[i][j].setActive()
+                            j += 1
+
+                        case 255:
+                            i += 1
+                            j = 0
+
+                except IndexError as ex:
+                    raise Exception(f"Program can not load field that is bigger than active field yet or save file is corrupted: {ex}")
+
+
+
+
 
 class Game:
     MAX_FPS = 144
-    GRID_SIZE = Vector2(40,  40)
+    GRID_SIZE = Vector2(35,  35)
     CELL_SIZE = Vector2(15,  15)
     CELL_MARGIN = Vector2(0, 0)
     # GRID_THICKNESS = round(0.08 * (CELL_SIZE.x + CELL_SIZE.y) / 2)
@@ -216,7 +271,7 @@ class Game:
     MAX_GAME_ITERATIONS_PER_SECOND = 10
     PERFORM_ACTIONS_IN_PLACE = False
     CAP_FPS_TO_REAL_TIME_TICKS = False
-    MENU_SIZE = Vector2(0, 100)
+    MENU_SIZE = Vector2(0, 200)
     GAME_ACTIVE = True
     GUI_ACTIVE = True
     MENU_LAYOUT = {
@@ -230,6 +285,12 @@ class Game:
                                        "border_width": 4}},
         "Decrease max game speed": {"obj": Cell, "state": enums.CellStates.empty,
                                     "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(150, 31), "size": Vector2(30, 30),
+                                                   "border_width": 4}},
+        "Save field": {"obj": Cell, "state": enums.CellStates.empty,
+                                    "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(350, 0), "size": Vector2(30, 30),
+                                                   "border_width": 4}},
+        "Load field": {"obj": Cell, "state": enums.CellStates.empty,
+                                    "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(350, 31), "size": Vector2(30, 30),
                                                    "border_width": 4}},
 
     }
@@ -394,6 +455,31 @@ class Game:
                             pass
                         case other:
                             raise Exception(f"Unacceptable argument: {other}")
+
+                case "Save field":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.field.saveField()
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
+                case "Load field":
+                    state = menu_btn.getState()
+                    match state:
+                        case enums.CellStates.not_empty:
+                            self.field.loadField()
+                            menu_btn.changeState()
+
+                        case enums.CellStates.empty:
+                            pass
+                        case other:
+                            raise Exception(f"Unacceptable argument: {other}")
+
 
 
 
