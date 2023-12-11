@@ -18,10 +18,10 @@ SAVE_FILE_PATTERN = bytearray([1, 1, 1, 0, 0, 1, 0, 0])
 
 
 class Cell:
-    def __init__(self, gui_object: gui.classes.Cell, state: enums.CellStates.__dict__ = enums.CellStates.empty, doOnClickEvents: tuple[Callable, ...] = ()):
+    def __init__(self, gui_object: gui.classes.Cell, state: enums.CellStates.__dict__ = enums.CellStates.empty, do_on_click_events: tuple[Callable, ...] = ()):
         self.__state = state
         self.__gui_object = gui_object
-        self.doOnClickEvents = doOnClickEvents
+        self.do_on_click_events = do_on_click_events
 
         match self.__state:
             case enums.CellStates.not_empty:
@@ -30,6 +30,9 @@ class Cell:
                 self.setInactive()
             case other:
                 raise Exception(f"Unacceptable arg: {other}")
+
+    def setDoOnClickEvents(self, do_on_click_events):
+        self.do_on_click_events = do_on_click_events
 
     def changeState(self):
         match self.__state:
@@ -59,23 +62,23 @@ class Cell:
         gui_obj.update()
 
         if process_clicks:
-            is_pressed = mouse_click_state[0]
-            is_inside = gui_obj.checkMouseWithinBounds(mouse_pos)
+            is_mouse_pressed = mouse_click_state[0]
+            is_mouse_inside = gui_obj.checkMouseWithinBounds(mouse_pos)
 
-            if is_inside and is_pressed:
+            if is_mouse_inside and is_mouse_pressed:
                 if gui_obj.next_time_mouse_click_accepted <= time.time():
                     gui_obj.next_time_mouse_click_accepted = time.time() + gui_obj.MOUSE_CLICK_ACCEPT_TIME_INTERVAL
                     self.changeState()
 
     def doOnClick(self):
-        for doOnClickEvent in self.doOnClickEvents:
-            doOnClickEvent()
+        for do_on_click_events in self.do_on_click_events:
+            do_on_click_events()
 
 
 class Field:
     def __init__(self,
                  gui_drawer: gui.classes.GUI_Drawer,
-                 start_mode: enums.StartModes.__dict__,
+                 start_mode: enums.FieldStartModes.__dict__,
                  not_empty_cells_percent_approx: int,
                  grid_size: Vector2,
                  grid_thickness: int,
@@ -112,12 +115,12 @@ class Field:
                                            )
 
                 match self.__start_mode:
-                    case enums.StartModes.empty_field:
+                    case enums.FieldStartModes.empty_field:
                         cell = Cell(gui_obj)
-                    case enums.StartModes.full_field:
+                    case enums.FieldStartModes.full_field:
                         cell = Cell(gui_obj)
                         cell.changeState()
-                    case enums.StartModes.random_field:
+                    case enums.FieldStartModes.random_field:
                         cell = self.randCellState(gui_obj, self.__not_empty_cells_percent_approx)
 
                 tmp.append(cell)
@@ -255,18 +258,48 @@ class Field:
                 except IndexError as ex:
                     raise Exception(f"Program can not load field that is bigger than active field yet or save file is corrupted: {ex}")
 
+class GameObject:
+    def __init__(self, gui_obj: gui.classes.GUI_Object, on_click_event: Callable):
+        self.gui_obj = gui_obj
+        self.on_click_event = on_click_event
+
+    def onClick(self):
+        self.on_click_event()
 
 
+from enum import member
+
+class Layout:
+    class StartMenu(Enum):
+        __start_btn_gui_obj = gui.classes.Cell()
+        start_btn = GameObject("")
+        settings_btn = GameObject("")
+
+    class Game:
+        @member
+        class Grid(Enum):
+            pass
+
+        @member
+        class Menu(Enum):
+            pass
+
+# print(Layout.StartMenu.__members__)
+#
+#
+# exit()
 
 
 class Game:
+    GAME_STATE = enums.GameStates.start_menu
+
     MAX_FPS = 144
     GRID_SIZE = Vector2(35,  35)
     CELL_SIZE = Vector2(15,  15)
     CELL_MARGIN = Vector2(0, 0)
     # GRID_THICKNESS = round(0.08 * (CELL_SIZE.x + CELL_SIZE.y) / 2)
     GRID_THICKNESS = 0
-    START_MODE = enums.StartModes.random_field
+    FIELD_START_MODE = enums.FieldStartModes.random_field
     NOT_EMPTY_CELLS_PERCENT_APPROX = 30
     MAX_GAME_ITERATIONS_PER_SECOND = 10
     PERFORM_ACTIONS_IN_PLACE = False
@@ -299,7 +332,6 @@ class Game:
         "Load field": {"obj": Cell, "state": enums.CellStates.empty,
                                     "gui_kwargs": {"pos": Vector2(0, 0) + Vector2(350, 31), "size": Vector2(30, 30),
                                                    "border_width": 4}},
-
     }
 
 
@@ -309,11 +341,11 @@ class Game:
         self.not_empty_cells_percent_approx = self.NOT_EMPTY_CELLS_PERCENT_APPROX
         self.max_iterations_per_second = self.MAX_GAME_ITERATIONS_PER_SECOND
         self.perform_actions_in_place = self.PERFORM_ACTIONS_IN_PLACE
-        self.start_mode = self.START_MODE
+        self.field_start_mode = self.FIELD_START_MODE
 
         self.gui_drawer = gui.classes.GUI_Drawer(self.GRID_SIZE, self.GRID_THICKNESS, self.CELL_SIZE, self.MENU_SIZE, self.MENU_LAYOUT, self.MAX_FPS)
         self.field = Field(self.gui_drawer,
-                           self.start_mode,
+                           self.field_start_mode,
                            self.not_empty_cells_percent_approx,
                            self.GRID_SIZE,
                            self.GRID_THICKNESS,
@@ -512,8 +544,6 @@ class Game:
                             raise Exception(f"Unacceptable argument: {other}")
 
 
-
-
     def processGUI(self):
 
         self.gui_drawer.clearScreen()
@@ -565,6 +595,13 @@ class Game:
         self.gui_thread = threading.Thread(target=self.runGUI, args=())
         self.gui_thread.start()
 
+    def runStartMenu(self):
+        while 1:
+            self.gui_drawer.drawStartMenu()
+
+        self.runGUI_threaded()
+        self.runGame()
+
 def processGameIterationInPlace(_field: list[list[Cell, ...], ...]):
     """
     Doesnt work properly due to per-line processing
@@ -596,8 +633,6 @@ def calcScreenSize(grid_size: Vector2, cell_size: Vector2) -> Vector2:
 def main():
     game = Game()
 
-    game.runGUI_threaded()
-    game.runGame()
-
+    game.runStartMenu()
 
 main()

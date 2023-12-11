@@ -152,12 +152,17 @@ class GUI_Drawer:
     def drawMenu(self):
         self.menu.update()
 
+
+    def drawStartMenu(self):
+        self.start_menu.update()
+
     def clearScreen(self, color: Colors.__dict__ = Colors.black):
         self.screen.fill(color)
 
     def updateScreen(self):
         pg.display.update()
         self.clock.tick(self.__max_fps)
+
 
 
 if __name__ == "__main__":
